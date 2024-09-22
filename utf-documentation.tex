@@ -1,0 +1,184 @@
+\documentclass[4paper,12pt]{article}
+
+% Languages
+\usepackage{cmap}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+
+% Formatting
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{multicol}
+\usepackage{multirow}
+
+\titleformat{\subsection}[runin]{\normalfont\large\bfseries}{\thesubsection}{1em}{}
+\titlespacing*{\subsection}{10pt}{0.5em}{0.5em}
+\titleformat{\subsubsection}[runin]{\normalfont\normalsize\bfseries}{\thesubsubsection}{1em}{}
+\titlespacing*{\subsubsection}{20pt}{0.5em}{0.5em}
+
+% Layout
+\usepackage[margin=1.1cm]{geometry}
+\usepackage{indentfirst}
+\setlength{\parskip}{0.2cm}
+
+% Links
+\usepackage{hyperref}
+
+\author{Пьянков Даниил, 5130904/10101}
+\title{utf-documentation}
+\date{\today}
+
+\begin{document}
+	\maketitle
+	\tableofcontents
+	
+	\section{Описание и основной функционал}
+	\textbf{UTF} (\textit{\textbf{U}niversity \textbf{T}est \textbf{F}orms}) - это веб-приложение, предоставляющее \textbf{преподавателям} следующий функционал:
+	
+	\begin{enumerate}
+		\item Создавать формы тестирования студентов.
+		\item Настраивать формы, добавляя в них разделы и вопросы с одним или несколькими вариантами ответов.
+		\item Указывать временной промежуток, в который студенты могут выполнять тест. Также можно для каждого задания теста отдельно задавать максимальное время на выполнение.
+		\item Назначать формы тестирования всем студентам из определенных групп.
+		\item По истечении времени выполнения теста автоматически получать на указанную почту статистику по каждому студенту в виде Excel-отчетов.
+	\end{enumerate}
+	
+	Также UTF позволяет \textbf{студентам} выполнять следующие действия:
+	\begin{enumerate}
+		\item Просматривать назначенные им формы тестирования, с возможностью отображения даты дедлайна.
+		
+		\item Выполнять задания тестов, а также в завершении тестирования видеть свой результат.
+	\end{enumerate}
+	
+	Тесты будут открываться у всех студентов одновременно, причем сами задания будут у всех студентов отображаться в случайном порядке. Каждое задание теста будет находиться на отдельной странице, чтобы перейти к следующему заданию, нужно ответить на текущее задание.
+	
+	Такая логика работы тестирующей системы позволит избежать ситуаций, когда первый студент заходит на тестирование, сохраняет все задания, после чего оставшиеся студенты уже знают задания теста.
+	
+	Кроме того, зайти на тест с "левого" аккаунта не получится. Все аккаунты, как преподавателей, так и студентов, должны быть верифицированы администраторами, для того, чтобы они могли создавать или выполнять тесты. То есть зайти на тестирование и сохранить задания просто так не получится, нужно будет входить в свой аккаунт, и по честному выполнять тест.
+	
+	\section{High-level архитектура UTF}
+	\subsection{Описание основных микросервисов}
+	\subsubsection{user-service}
+	user-service отвечает за хранение пользовательской информации преподавателей и студентов. Именно в этом микросервисе будет находиться логика регистрации, верификации аккаунта, аутентификации для получения токенов. Также этот сервис будет способен отдавать пользовательскую информацию по идентификатору пользователя.
+	
+	\subsubsection{form-service}
+	form-service отвечает за создание форм тестирований. Он содержит в себе эндпоинт, принимающий данные об уже сконфигурированной форме тестирования, и сохраняет эти данные в базу, чтобы потом студенты могли получить данные этой формы.
+	
+	\subsubsection{assign-service}
+	assign-service отвечает за то, чтобы назначать формы тестирования студентам определеных групп. После того, как преподаватель назначает тестирование определенной группе, у всех студентов этой группы в личном кабинете появляется назначенное тестирование, которое необходимо будет выполнить.
+	
+	\subsubsection{answer-service}
+	answer-service содержит логику сохранения пользовательских ответов. Он принимает в себя идентификатор студента, вопроса, а также ответа студента на вопрос. Далее при завершении тестирования он может определить на сколько вопросов студент ответил правильно.
+	
+	\subsubsection{report-service}
+	report-service отвечает за формирование Excel-отчетов для преподавателей по результатам прошедшего тестирования. В отчете можно увидеть данные о том, сколько баллов набрал каждый студент (данные сохраняются по группам, один лист - одна группа), а также посмотреть статистику по каждому вопросу, то есть сколько процентов ответили на него правильно / не правильно.
+	
+	\subsubsection{statistic-service}
+	statistic-service выступает в роли аггрегатора данных. По запросу report-service на предоставление ему статистики для формирования отчета statistic-service ходит в assign, answer и form-сервисы для сбора данных о результатах студентов, которые прошли определенный тест. Далее эти данные обрабатываются и рассчитываются необходимые показатели, которые возвращаются обратно в report-service.
+	
+	\subsection{Взаимодействие микросервисов между собой}	
+	
+	\section{Архитектура баз данных для каждого микросервиса. Описание таблиц}
+	\subsection{user-service}
+	\subsubsection{Таблица \textit{student}}
+	В таблице \textit{student} хранятся данные о студентах. Эта таблица имеет следующие колонки:
+	\begin{itemize}
+		\item id (UUID)
+		\item firstName (varchar)
+		\item lastName (varchar)
+		\item middleName (varchar)
+		\item username (varchar)
+		\item hashed\_password\_bytes (bytea)
+		\item group\_id (FK to group table) (UUID)
+		\item verified (bool)
+	\end{itemize}
+	
+	\subsubsection{Таблица \textit{group}}
+	В таблице \textit{group} хранятся данные о группах студентов. Эта таблица имеет следующие колонки:
+	\begin{itemize}
+		\item id (UUID)
+		\item institute\_number (varchar) % 5130904
+		\item group\_number (varchar) % 10101
+	\end{itemize}
+	
+	\subsubsection{Таблица \textit{teacher}}
+	В таблице \textit{teacher} хранятся данные о преподавателях. Эта таблица имеет следующие колонки:
+	\begin{itemize}
+		\item id (UUID)
+		\item firstName (varchar)
+		\item lastName (varchar)
+		\item middleName (varchar)
+		\item username (varchar)
+		\item hashed\_password\_bytes (bytea)
+		\item verified (bool)
+	\end{itemize}
+	
+	\subsection{form-service}
+	\subsubsection{Таблица \textit{form}}
+	В таблице \textit{form} хранятся данные о созданной преподавателем форме тестирования. Эта таблица имеет следующие колонки:
+	\begin{itemize}
+		\item id (UUID)
+		\item name (varchar)
+		\item description (varchar)
+		\item teacher\_id (UUID)
+		\item create\_date (timestamp)
+		\item start\_date (timestamp)
+		\item end\_date (timestamp)
+	\end{itemize}
+	
+	\subsubsection{Таблица \textit{question}}
+	В таблице \textit{question} хранятся данные о вопросах на форме тестирования. Эта таблица имеет следующие колонки:
+	\begin{itemize}
+		\item id (UUID)
+		\item text (varchar)
+		\item description (varchar)
+		\item form\_id (UUID) (FK на form (id))
+		\item time\_amount\_ms (bigint)
+		\item order\_number (integer)
+	\end{itemize}
+	
+	\subsubsection{Таблица \textit{answer}}
+	В таблице \textit{answer} хранятся данные о вариантах ответов на вопросы на форме тестирования. Эта таблица имеет следующие колонки:
+	\begin{itemize}
+		\item id (UUID)
+		\item text (varchar)
+		\item question\_id (UUID) (FK на question(id))
+		\item correct (bool)
+	\end{itemize}
+	
+	\subsection{assign-service}
+	\subsubsection{Таблица \textit{assignment}}
+	В таблице \textit{assignment} хранятся данные о том, каким группам назначена определенная форма тестирования. Эта таблица имеет следующие колонки:
+	\begin{itemize}
+		\item id (UUID)
+		\item form\_id (UUID)
+		\item group\_id (UUID)
+	\end{itemize}
+	
+	\subsection{answer-service}
+	\subsubsection{Таблица \textit{student\_answer}}
+	В таблице \textit{student\_answer} хранятся данные о том, какие варианты ответа выбрал пользователь на форме тестирования. Эта таблица имеет следующие колонки:
+	\begin{itemize}
+		\item id (UUID)
+		\item student\_id (UUID)
+		\item question\_id (UUID)
+		\item chosen\_answer\_id (UUID)
+	\end{itemize}
+	
+	\subsection{report-service}
+	Поскольку report-service лишь дергает statistic-service и по полученной статистике формирует Excel-отчет, ему не нужно сохранять никакие данные в БД.
+	
+	\subsection{statistic-service}
+	Поскольку statistic-service лишь собирает данные с других сервисов, и рассчитывает необходимые показатели, у него нет необходимости сохранять какие-либо данные в БД.
+		
+	\section{API микросервисов. Их HTTP-эндпоинты с примерами запросов и ответов}
+	\subsection{user-service}
+	\subsection{form-service}
+	\subsection{assign-service}
+	\subsection{answer-service}
+	\subsection{report-service}
+	\subsection{statistic-service}
+	
+	\section{Стек технологий}
+\end{document}
